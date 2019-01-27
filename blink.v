@@ -6,12 +6,8 @@ module top(
 
 	reg [25:0] counter;
 
-	always @(posedge clk) begin
+	always @(posedge clk)
 		counter <= counter + 1;
 
-		if (counter > 25'hA00000)
-			led_r <= 1; // turn LED off
-		else
-			led_r <= 0; // turn LED on
-	end
+	assign led_r = counter[25];
 endmodule
