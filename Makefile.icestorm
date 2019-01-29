@@ -1,6 +1,3 @@
-#
-# Upduino v2
-#
 DEVICE-upduino ?= up5k
 FOOTPRINT-upduino ?= sg48
 PIN_SRC-upduino ?= upduino_v2.pcf
@@ -13,12 +10,16 @@ DEVICE-tomu := up5k
 FOOTPRINT-tomu := uwg30
 PIN_SRC-tomu := tomu.pcf
 
+BOARD ?= upduino
 DEVICE := $(DEVICE-$(BOARD))
 FOOTPRINT := $(FOOTPRINT-$(BOARD))
 PIN_SRC := $(PIN_SRC-$(BOARD))
 
 
-PNR ?= $(ICEPATH)nextpnr-ice40
+#PNR ?= nextpnr
+PNR ?= arachne
+
+
 .SECONDARY:
 
 %.flash: %.bin
@@ -32,18 +33,40 @@ PNR ?= $(ICEPATH)nextpnr-ice40
 %.json: %.v
 	$(ICEPATH)yosys \
 		-q \
-		-p 'read_verilog -I usb $<' \
+		-p 'read_verilog $<' \
 		-p 'synth_ice40 -top top -json $@' \
 		-E .$(basename $@).d \
 
+%.blif: %.v
+	$(ICEPATH)yosys \
+		-q \
+		-p 'read_verilog $<' \
+		-p 'synth_ice40 -top top -blif $@' \
+		-E .$(basename $@).d \
+
+ifeq ($(PNR),nextpnr)
 %.asc: $(PIN_SRC) %.json
-	$(PNR) \
+	$(ICEPATH)nextpnr-ice40 \
 		--$(DEVICE) \
 		--package $(FOOTPRINT) \
 		--asc $@ \
 		--pcf $(PIN_SRC) \
 		--json $(basename $@).json \
 		`[ -r $(basename $@).py ] && echo --pre-pack $(basename $@).py` \
+
+endif
+
+ifeq ($(PNR),arachne)
+
+%.asc: $(PIN_SRC) %.blif
+	$(ICEPATH)arachne-pnr \
+		--device $(subst lp,,$(subst up,,$(DEVICE))) \
+		--package $(FOOTPRINT) \
+		--output-file $@ \
+		--pcf-file $^ \
+
+endif
+
 
 %.gui: %.json
 	$(PNR) --gui --up5k --pcf $(PIN_SRC) --json $<
